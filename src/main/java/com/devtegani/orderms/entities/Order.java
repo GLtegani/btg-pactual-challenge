@@ -26,7 +26,6 @@ public class Order {
     private Long customerId;
     @Field(targetType = FieldType.DECIMAL128)
     private BigDecimal total;
-    @Setter(AccessLevel.NONE)
     private List<OrderItem> items = new ArrayList<>();
 
     public Order(OrderCreatedEventDTO orderCreatedEventData) {

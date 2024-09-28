@@ -41,7 +41,6 @@ class OrderControllerTest {
 
     @Nested
     class ListOrders {
-
         @Test
         void shouldReturnHttpOk() {
             Long customerId = 1L;
@@ -62,7 +61,7 @@ class OrderControllerTest {
         }
 
         @Test
-        void shouldPassCorrectParamtersToService() {
+        void shouldPassCorrectParametersToService() {
             Long customerId = 1L;
             Integer page = 0;
             Integer pageSize = 10;
