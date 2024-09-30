@@ -6,6 +6,7 @@ import com.devtegani.orderms.factory.OrderCreatedEventDTOFactory;
 import com.devtegani.orderms.factory.OrderFactory;
 import com.devtegani.orderms.listener.dto.OrderCreatedEventDTO;
 import com.devtegani.orderms.repositories.OrderRepository;
+import org.bson.Document;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,12 +18,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
@@ -37,6 +42,9 @@ class OrderServiceTest {
 
     @Captor
     ArgumentCaptor<Order> orderCaptor;
+
+    @Captor
+    ArgumentCaptor<Aggregation> aggregationCaptor;
 
     @Nested
     class Save {
@@ -116,6 +124,72 @@ class OrderServiceTest {
             assertEquals(page.getContent().get(0).getOrderId(), response.getContent().get(0).orderId());
             assertEquals(page.getContent().get(0).getCustomerId(), response.getContent().get(0).clientId());
             assertEquals(page.getContent().get(0).getTotal(), response.getContent().get(0).total());
+        }
+    }
+
+    @Nested
+    class FindTotalOnOrdersByCustomerId {
+        @Test
+        void shouldCallMongoTemplate() {
+//            ARRANGE
+            Long customerId = 1L;
+            BigDecimal totalExpected = BigDecimal.valueOf(1);
+            AggregationResults aggregationResult = mock(AggregationResults.class);
+            doReturn(new Document("total", totalExpected)).when(aggregationResult).getUniqueMappedResult();
+            doReturn(aggregationResult)
+                    .when(mongoTemplate)
+                    .aggregate(any(Aggregation.class), anyString(), eq(Document.class));
+
+//            ACT
+            BigDecimal total = orderService.findTotalOnOrdersByCustomerId(customerId);
+
+//            ASSERT
+            verify(mongoTemplate, times(1))
+                    .aggregate(any(Aggregation.class), anyString(), eq(Document.class));
+            assertEquals(totalExpected, total);
+        }
+
+        @Test
+        void shouldUseCorrectAggregation() {
+//            ARRANGE
+            Long customerId = 1L;
+            BigDecimal totalExpected = BigDecimal.valueOf(1);
+            AggregationResults aggregationResult = mock(AggregationResults.class);
+            doReturn(new Document("total", totalExpected)).when(aggregationResult).getUniqueMappedResult();
+            doReturn(aggregationResult)
+                    .when(mongoTemplate)
+                    .aggregate(aggregationCaptor.capture(), anyString(), eq(Document.class));
+
+//            ACT
+            orderService.findTotalOnOrdersByCustomerId(customerId);
+
+//            ASSERT
+            Aggregation aggregation = aggregationCaptor.getValue();
+            Aggregation aggregationExpected = newAggregation(
+                    match(Criteria.where("customerId").is(customerId)),
+                    group().sum("total").as("total")
+            );
+
+            assertEquals(aggregationExpected.toString(), aggregation.toString());
+        }
+
+        @Test
+        void shouldQueryCorrectTable() {
+            //            ARRANGE
+            Long customerId = 1L;
+            BigDecimal totalExpected = BigDecimal.valueOf(1);
+            AggregationResults aggregationResult = mock(AggregationResults.class);
+            doReturn(new Document("total", totalExpected)).when(aggregationResult).getUniqueMappedResult();
+            doReturn(aggregationResult)
+                    .when(mongoTemplate)
+                    .aggregate(any(Aggregation.class), eq("tb_orders"), eq(Document.class));
+
+//            ACT
+            orderService.findTotalOnOrdersByCustomerId(customerId);
+
+//            ASSERT
+            verify(mongoTemplate, times(1))
+                    .aggregate(any(Aggregation.class), eq("tb_orders"), eq(Document.class));
         }
     }
 }
